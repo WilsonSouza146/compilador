@@ -12,7 +12,7 @@ namespace compilador
         {
             try
             {
-                using (var sr = new StreamReader(path))
+                using (StreamReader sr = new StreamReader(path))
                 {
                     this.content = sr.ReadToEnd();
                 }
@@ -48,7 +48,7 @@ namespace compilador
 
         private bool isEOF()
         {
-            return pos == content.Length;
+            return pos >= content.Length;
         }
 
         private char nextChar()
@@ -61,12 +61,55 @@ namespace compilador
             return content[pos++];
         }
 
-        private void back()
+        private void back() => pos--;
+
+        private bool isReservedKey(string term)
         {
-            if (!isEOF())
+            return (new[]
             {
-                pos--;
-            } 
+                "program",
+                "begin",
+                "end",
+                "real",
+                "integer",
+                "read",
+                "write",
+                "if",
+                "then",
+                "else",
+            }).Contains(term);
+        }
+
+        private bool isAssign(char c)
+        {
+            return (new[]
+            {
+                ":",
+                ":=",
+            }).Contains(c.ToString());
+        }
+
+        private bool isArithmetic(char c)
+        {
+            return c is '+' or '-' or '*' or '/';
+        }
+
+        private bool isSymbol(char c)
+        {
+            return c is '(' or ')' or ';' or ',' or '.' or '$';
+        }
+
+        private bool isRelational(char c)
+        {
+            return (new[]
+            {
+                ">",
+                "<",
+                ">=",
+                "=",
+                "<=",
+                "<>",
+            }).Contains(c.ToString());
         }
 
         public Token nextToken()
@@ -80,6 +123,10 @@ namespace compilador
             state = 0;
             while (true)
             {
+                if (isEOF())
+                {
+                    pos = content.Length + 1;
+                }
                 c = nextChar();
                 switch (state)
                 {
@@ -98,6 +145,33 @@ namespace compilador
                         else if (isEspace(c))
                         {
                             state = 0;
+                        }
+                        else if (isArithmetic(c))
+                        {
+                            state = 5;
+                            term += c;
+                        }
+                        else if (isRelational(c))
+                        {
+                            state = c switch
+                            {
+                                '<' => 6,
+                                '>' => 8,
+                                '=' => 10,
+                                _ => state
+                            };
+
+                            term += c;
+                        }
+                        else if (isSymbol(c))
+                        {
+                            state = 11;
+                            term += c;
+                        }
+                        else if (isAssign(c))
+                        {
+                            state = 12 ;
+                            term += c;
                         }
                         break;
                     case 1:
@@ -118,7 +192,7 @@ namespace compilador
                         }
                         else
                         { 
-                            throw new RuntimeBinderException("Numero INTEGER invalido");
+                            throw new RuntimeBinderInternalCompilerException("Numero INTEGER invalido");
    
                         }
 
@@ -131,7 +205,7 @@ namespace compilador
                         }
                         else
                         {
-                            throw new RuntimeBinderException("Numero invalido");
+                            throw new RuntimeBinderInternalCompilerException("Numero invalido");
                         }
 
                         break;
@@ -148,16 +222,23 @@ namespace compilador
                         }
                         else
                         {
-                            throw new RuntimeBinderException("Numero REAL invalido");
+                            throw new RuntimeBinderInternalCompilerException("Numero REAL invalido");
 
                         }
 
                         break;
                     case 4:
+                        
                         if (isDigit(c) || isLetter(c))
                         {
                             state = 4;
                             term += c;
+                            Console.WriteLine(term);
+                        }
+                        else if (isReservedKey(term))
+                        {
+                            back();
+                            return new Token(TokenEnum.RESERVED_KEY, term);
                         }
                         else
                         {
@@ -165,6 +246,61 @@ namespace compilador
                             return new Token(TokenEnum.IDENT, term);
                         }
                         break;
+                    case 5:
+                        back();
+                        return new Token(TokenEnum.ARITHMETIC, term);
+                    case 6:
+                        if (c is '=' or '>')
+                        {
+                            term += c; 
+                            state = 7;
+                           
+                        }
+                        else
+                        {
+                            back();
+                            return new Token(TokenEnum.RELATIONAL, term);
+                        }
+                        break;
+                    case 7:
+                        back();
+                        return new Token(TokenEnum.RELATIONAL, term);
+                    case 8:
+                        if (c is '=')
+                        {
+                            term += c;
+                            state = 9;
+                        }
+                        else
+                        {
+                            back();
+                            return new Token(TokenEnum.RELATIONAL, term);
+                        }
+                        break;
+                    case 9:
+                        back();
+                        return new Token(TokenEnum.RELATIONAL, term);
+                    case 10:
+                        back();
+                        return new Token(TokenEnum.RELATIONAL, term);
+                    case 11:
+                        back();
+                        return new Token(TokenEnum.SYMBOL, term);
+                    case 12:
+                        if (c == '=')
+                        {
+                            term += c;
+                            state = 13;
+                        }
+                        else
+                        {
+                            back();
+                            return new Token(TokenEnum.ASSIGN, term);
+                        }
+                        break;
+                    case 13:
+                        back();
+                        return new Token(TokenEnum.ASSIGN, term);
                 }
             }
         }

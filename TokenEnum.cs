@@ -7,5 +7,10 @@ namespace compilador
         RESERVED_KEY,
         INTEGER,
         REAL,
+        ARITHMETIC,
+        RELATIONAL,
+        ASSIGN,
+        SYMBOL,
+        
     }
 }
