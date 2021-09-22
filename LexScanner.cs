@@ -43,7 +43,7 @@ namespace compilador
 
         private bool isEspace(char c)
         {
-            return c is ' ' or '\n' or '\t';
+            return c is ' ' or '\n' or '\t' or '\r';
         }
 
         private bool isEOF()
@@ -55,7 +55,7 @@ namespace compilador
         {
             if (isEOF())
             {
-                return (char) 0;
+                return (char)0;
             }
 
             return content[pos++];
@@ -121,8 +121,11 @@ namespace compilador
             char c;
             String term = "";
             state = 0;
+            //int i = 0;
             while (true)
             {
+                //i++;
+                //Console.WriteLine($"State {i} = {state}");
                 if (isEOF())
                 {
                     pos = content.Length + 1;
@@ -131,7 +134,11 @@ namespace compilador
                 switch (state)
                 {
                     case 0:
-                        if (isDigit(c))
+                        if (isEspace(c))
+                        {
+                            state = 0;
+                        }
+                        else if (isDigit(c))
                         {
                             state = 1;
                             term += c;
@@ -141,10 +148,6 @@ namespace compilador
                             state = 4;
                             term += c;
 
-                        }
-                        else if (isEspace(c))
-                        {
-                            state = 0;
                         }
                         else if (isArithmetic(c))
                         {
@@ -173,8 +176,12 @@ namespace compilador
                             state = 12 ;
                             term += c;
                         }
+                        else
+                        {
+                            return null;
+                        }
                         break;
-                    case 1:
+                            case 1:
                         if (isDigit(c))
                         {
                             state = 1;
@@ -233,7 +240,6 @@ namespace compilador
                         {
                             state = 4;
                             term += c;
-                            Console.WriteLine(term);
                         }
                         else if (isReservedKey(term))
                         {
