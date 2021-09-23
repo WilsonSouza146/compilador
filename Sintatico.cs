@@ -171,7 +171,27 @@ namespace compilador
             }
             else if (token.type == TokenEnum.IDENT)
             {
-                
+                getToken();
+                if (token.type == TokenEnum.ASSIGN)
+                {
+                    getToken();
+                    expressao();
+                }
+            }
+            else if (verifyToken("if"))
+            {
+                getToken();
+                condicao();
+                if (verifyToken("then"))
+                {
+                    getToken();
+                    comandos();
+                    pfalsa();
+                   if (token.term.Equals("$"))
+                   {
+                       getToken();
+                   }
+                }
             }
             else
             {
@@ -183,7 +203,6 @@ namespace compilador
         private void mais_comandos()
         {
             Console.WriteLine("mais_comandos");
-            getToken();
             if (token.term == ";")
             {
                 getToken();
@@ -192,14 +211,11 @@ namespace compilador
                     comandos();
                 }
             }
-            else
-            {
-                throw new Exception($"Erro sintatico esperado ';' recebido {token}");
-            }
         }
 
         private void verif_parenteses()
         {
+            Console.WriteLine("verif_parenteses");
             getToken();
             if (token.term.Equals("("))
             {
@@ -211,6 +227,7 @@ namespace compilador
                     {
                         throw new Exception($"Erro sintatico, esperado ')'  e foi encontrado {token}");
                     }
+                    getToken();
                 }
                 else
                 {
@@ -220,6 +237,139 @@ namespace compilador
             else
             {
                 throw new Exception($"Erro sintatico, esperado '('  e foi encontrado {token}");
+            }
+        }
+
+        private void expressao()
+        {
+            Console.WriteLine("expressao");
+
+            termo();
+            outros_termos();
+        }
+
+        private void termo()
+        {
+            Console.WriteLine("termo");
+            op_un();
+            fator();
+            mais_fatores();
+        }
+
+        private void op_un()
+        {
+            
+            Console.WriteLine("op_un");
+
+            if (token.term.Equals("-"))
+            {
+                getToken();
+            }
+        }
+
+        private void fator()
+        {
+            Console.WriteLine("fator");
+            if (token.type is TokenEnum.IDENT or TokenEnum.REAL or TokenEnum.INTEGER)
+            {
+                getToken();
+            }
+
+            else if (!token.term.Equals(";"))
+            {
+                getToken();
+                if (token.term.Equals("("))
+                {
+                    expressao();
+                    getToken();
+                    if (token.term.Equals(")"))
+                    {
+                        getToken();
+                    }
+                }
+            }
+        }
+
+        private void mais_fatores()
+        {
+            Console.WriteLine("mais_fatores");
+            
+            if (token.term is "*" or "/")
+            {
+                op_mul();
+                fator();
+                mais_fatores();
+            }
+        }
+
+        private void outros_termos()
+        {
+            Console.WriteLine("outros_termos");
+
+            if (token.term is "+" or "-")
+            {
+                op_ad();
+                termo();
+                outros_termos();
+            }
+        }
+
+        private void op_mul()
+        {
+            Console.WriteLine("op_mul");
+
+            if (token.term is "*" or "/")
+            {
+                getToken();
+            }
+            else
+            {
+                throw new Exception($"Erro sintatico, esperado '*' ou '/' recebido {token}");
+
+            }
+        }
+
+        private void op_ad()
+        {
+            Console.WriteLine("op_ad");
+
+            if (token.term is "+" or "-")
+            {
+                getToken();
+            }
+            else
+            {
+                throw new Exception($"Erro sintatico, esperado '+' ou '-' recebido {token}");
+
+            }
+        }
+
+        private void condicao()
+        {
+            expressao();
+            relacao();
+            expressao();
+        }
+
+        private void relacao()
+        {
+            Console.WriteLine("relacao");
+            if (token.type == TokenEnum.RELATIONAL)
+            {
+                getToken();
+            }
+        }
+
+        private void pfalsa()
+        {
+            Console.WriteLine("pfalsa");
+            if (!token.term.Equals("$"))
+            {
+                if (verifyToken("else"))
+                {
+                    getToken();
+                    comandos();
+                }
             }
         }
     }
