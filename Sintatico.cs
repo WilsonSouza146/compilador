@@ -241,15 +241,24 @@ namespace compilador
         {
             
             Console.WriteLine("expressao");
-            verif_table_symbol();
-            if (typeExp != tableSymbol[token.term].type)
+            if (token.type == TokenEnum.IDENT)
             {
-                throw new Exception(
-                    $"Erro semantico, variavel '{token.term}'do tipo {tableSymbol[token.term].type} sendo usada em expressao do tipo {typeExp}");
+                verif_table_symbol();
+                if (typeExp != tableSymbol[token.term].type)
+                {
+                    throw new Exception(
+                        $"Erro semantico, variavel '{token.term}'do tipo {tableSymbol[token.term].type} sendo usada em expressao do tipo {typeExp}");
+                }
+            }
+            else
+            {
+                if (token.type != typeExp)
+                {
+                    throw  new Exception($"Erro semantico, variavel '{token.term}'do tipo {token.type} sendo usada em expressao do tipo {typeExp}");
+                }
             }
             termo();
             outros_termos();
-
         }
 
         private void termo()
@@ -280,8 +289,8 @@ namespace compilador
                 if (token.type == TokenEnum.IDENT)
                 {
                     verif_table_symbol();
+                    getTypeExp();
                 }
-                getTypeExp();
                 getToken();
             }
 
