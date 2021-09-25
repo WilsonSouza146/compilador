@@ -1,4 +1,7 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Data;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using Microsoft.CSharp.RuntimeBinder;
 
@@ -8,7 +11,8 @@ namespace compilador
     {
         private LexScanner lexico;
         private Token token;
-
+        private Dictionary<string, Symbol> tableSymbol = new Dictionary<string, Symbol>();
+        private TokenEnum type, typeExp;
         public Sintatico(string path)
         {
             lexico = new LexScanner(path);
@@ -128,6 +132,14 @@ namespace compilador
                 throw new Exception($"Erro sintatico, esperado 'INTEGER' ou 'REAL' e foi encontrado: {token}");
 
             }
+            if(token.term.Equals("integer"))
+            {
+                type = TokenEnum.INTEGER;
+            }
+            else
+            {
+                type = TokenEnum.REAL;
+            }
         }
 
         private void variaveis()
@@ -135,9 +147,18 @@ namespace compilador
             Console.WriteLine("variaveis");
             if (token.type == TokenEnum.IDENT)
             {
+                if (tableSymbol.ContainsKey(token.term))
+                {
+                    throw new Exception($"Erro semantico, identificador ja encontrado: {token.term}");
+                }
+                else
+                {
+                    tableSymbol.Add(token.term, new Symbol(type, token.term));
+                }
                 getToken();
                 mais_var(); 
             }
+            
             else
             {
                 throw new Exception($"Erro sintatico esperado 'IDENT' e foi encontrado: {token}");
@@ -171,6 +192,8 @@ namespace compilador
             }
             else if (token.type == TokenEnum.IDENT)
             {
+                verif_table_symbol();
+                getTypeExp();
                 getToken();
                 if (token.type == TokenEnum.ASSIGN)
                 {
@@ -181,6 +204,7 @@ namespace compilador
             else if (verifyToken("if"))
             {
                 getToken();
+                getTypeExp();
                 condicao();
                 if (verifyToken("then"))
                 {
@@ -213,39 +237,19 @@ namespace compilador
             }
         }
 
-        private void verif_parenteses()
-        {
-            Console.WriteLine("verif_parenteses");
-            getToken();
-            if (token.term.Equals("("))
-            {
-                getToken();
-                if (token.type == TokenEnum.IDENT)
-                {
-                    getToken();
-                    if (!(token.term.Equals(")")))
-                    {
-                        throw new Exception($"Erro sintatico, esperado ')'  e foi encontrado {token}");
-                    }
-                    getToken();
-                }
-                else
-                {
-                    throw new Exception($"Erro sintatico, esperado 'IDENT'  e foi encontrado {token}");
-                }
-            }
-            else
-            {
-                throw new Exception($"Erro sintatico, esperado '('  e foi encontrado {token}");
-            }
-        }
-
         private void expressao()
         {
+            
             Console.WriteLine("expressao");
-
+            verif_table_symbol();
+            if (typeExp != tableSymbol[token.term].type)
+            {
+                throw new Exception(
+                    $"Erro semantico, variavel '{token.term}'do tipo {tableSymbol[token.term].type} sendo usada em expressao do tipo {typeExp}");
+            }
             termo();
             outros_termos();
+
         }
 
         private void termo()
@@ -272,6 +276,12 @@ namespace compilador
             Console.WriteLine("fator");
             if (token.type is TokenEnum.IDENT or TokenEnum.REAL or TokenEnum.INTEGER)
             {
+               
+                if (token.type == TokenEnum.IDENT)
+                {
+                    verif_table_symbol();
+                }
+                getTypeExp();
                 getToken();
             }
 
@@ -371,6 +381,49 @@ namespace compilador
                     comandos();
                 }
             }
+        }
+
+        private void verif_parenteses()
+        {
+            Console.WriteLine("verif_parenteses");
+            getToken();
+            if (token.term.Equals("("))
+            {
+                getToken();
+                if (token.type == TokenEnum.IDENT)
+                {
+                    verif_table_symbol();
+                    getToken();
+                    if (!(token.term.Equals(")")))
+                    {
+                        throw new Exception($"Erro sintatico, esperado ')'  e foi encontrado {token}");
+                    }
+                    getToken();
+                }
+                else
+                {
+                    throw new Exception($"Erro sintatico, esperado 'IDENT'  e foi encontrado {token}");
+                }
+            }
+            else
+            {
+                throw new Exception($"Erro sintatico, esperado '('  e foi encontrado {token}");
+            }
+        }
+        
+        private void verif_table_symbol()
+        {
+            if (!tableSymbol.ContainsKey(token.term))
+            {
+                throw new Exception($"Erro semantico, variavel '{token}' sendo usada e nao foi declarada"); 
+            }
+        }
+
+        private void getTypeExp()
+        {
+            Console.WriteLine("getTypeExp");
+            typeExp = tableSymbol[token.term].type;
+            Console.WriteLine($"TypeEXP = {typeExp}");
         }
     }
 }
