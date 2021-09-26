@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Data;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Text;
 using Microsoft.CSharp.RuntimeBinder;
 
 namespace compilador
@@ -13,9 +14,36 @@ namespace compilador
         private Token token;
         private Dictionary<string, Symbol> tableSymbol = new Dictionary<string, Symbol>();
         private TokenEnum type, typeExp;
+        private int temp = 1;
+        private StringBuilder codeLine = new StringBuilder("cont - op ; arg1 ; arg2 ; result\n");
+        private int cont, i, linha;
         public Sintatico(string path)
         {
             lexico = new LexScanner(path);
+        }
+
+        private string geraTemp()
+        {
+            return "t" + temp++;
+        }
+
+        private string getLine()
+        {
+            i++;
+            linha = i;
+            return "&" + i ;
+        }
+        
+        private void replace_getLine(int cont)
+        {
+            codeLine.Replace("&" + linha, cont.ToString());
+            linha--;
+        }
+
+        private void code(string op, string arg1, string arg2, string result)
+        {
+            codeLine.Append(cont +" - "+ op + " ; " + arg1 + " ; " + arg2 + " ; " + result + "\n");
+            cont++; 
         }
 
         private bool verifyToken(string term)
@@ -40,6 +68,7 @@ namespace compilador
         {
             token = lexico.nextToken();
             Console.WriteLine($"Token = {token}");
+            
         }
 
 
@@ -59,6 +88,8 @@ namespace compilador
                     {
                         throw new Exception($"Erro sintatico, esperado '.' e recebido {token}");
                     }
+                    code("PARA","","","");
+                    Console.WriteLine(codeLine);
                     token = null;
                 }
             }
@@ -94,6 +125,22 @@ namespace compilador
             }
         }
         
+        private void dc_v()
+        {
+            Console.WriteLine("dc_v");
+            string tipo_dir = tipo_var();
+            getToken();
+            if (token.type == TokenEnum.ASSIGN)
+            { 
+                getToken();
+                variaveis(tipo_dir);
+            }
+            else
+            { 
+                throw new Exception($"Erro sintatico, esperado ':' e foi encontrado: {token}");
+
+            }
+        }
         private void mais_dc()
         {
             Console.WriteLine("mais_dc");
@@ -107,24 +154,8 @@ namespace compilador
                 throw new Exception($"Erro sintatico esperado ';' recebido {token}");
             }
         }
-        private void dc_v()
-        {
-            Console.WriteLine("dc_v");
-            tipo_var();
-            getToken();
-            if (token.type == TokenEnum.ASSIGN)
-            { 
-                getToken();
-                variaveis();
-            }
-            else
-            { 
-                throw new Exception($"Erro sintatico, esperado ':' e foi encontrado: {token}");
 
-            }
-        }
-
-        private void tipo_var()
+        private string tipo_var()
         {
             Console.WriteLine("tipo_var");
             if (!(verifyToken("integer") || verifyToken("real")))
@@ -135,14 +166,16 @@ namespace compilador
             if(token.term.Equals("integer"))
             {
                 type = TokenEnum.INTEGER;
+                return "0";
             }
             else
             {
                 type = TokenEnum.REAL;
+                return "0.0";
             }
         }
 
-        private void variaveis()
+        private void variaveis(string var_esq)
         {
             Console.WriteLine("variaveis");
             if (token.type == TokenEnum.IDENT)
@@ -155,10 +188,11 @@ namespace compilador
                 {
                     tableSymbol.Add(token.term, new Symbol(type, token.term));
                 }
+                code("ALME", var_esq, "", token.term);
                 getToken();
-                mais_var(); 
+                mais_var(var_esq); 
             }
-            
+
             else
             {
                 throw new Exception($"Erro sintatico esperado 'IDENT' e foi encontrado: {token}");
@@ -166,13 +200,13 @@ namespace compilador
             }
         }
 
-        private void mais_var()
+        private void mais_var(string mais_var_esq)
         {
             Console.WriteLine("mais_var");
             if (token.term.Equals(","))
             {
                 getToken();
-                variaveis();
+                variaveis(mais_var_esq);
             }
         }
         
@@ -188,27 +222,31 @@ namespace compilador
             Console.WriteLine("comando");
             if (verifyToken("read") || verifyToken("write"))
             {
-                verif_parenteses();
+                string op = token.term;
+                verif_parenteses(op);
             }
             else if (token.type == TokenEnum.IDENT)
             {
                 verif_table_symbol();
                 getTypeExp();
+                string ident = token.term;
                 getToken();
                 if (token.type == TokenEnum.ASSIGN)
                 {
                     getToken();
-                    expressao();
+                    string dir = expressao();
+                    code(":=",dir, "", ident);
                 }
             }
             else if (verifyToken("if"))
             {
                 getToken();
                 getTypeExp();
-                condicao();
+                string condicao_dir = condicao();
                 if (verifyToken("then"))
                 {
                     getToken();
+                    code("JF", condicao_dir, getLine(), "");
                     comandos();
                     pfalsa();
                    if (token.term.Equals("$"))
@@ -237,7 +275,7 @@ namespace compilador
             }
         }
 
-        private void expressao()
+        private string expressao()
         {
             
             Console.WriteLine("expressao");
@@ -252,85 +290,122 @@ namespace compilador
             }
             else
             {
-                if (token.type != typeExp)
+                if (token.type != typeExp && token.term != "-")
                 {
                     throw  new Exception($"Erro semantico, variavel '{token.term}'do tipo {token.type} sendo usada em expressao do tipo {typeExp}");
                 }
             }
-            termo();
-            outros_termos();
+            string termo_dir = termo();
+            string outros_termos_dir = outros_termos(termo_dir);
+            return outros_termos_dir;
         }
 
-        private void termo()
+        private string termo()
         {
             Console.WriteLine("termo");
-            op_un();
-            fator();
-            mais_fatores();
+            string op_minus = op_un();
+            string fator_dir = fator();
+            if (op_minus.Equals("-"))
+            {
+                string fator1_dir = geraTemp();
+                code(op_minus, fator_dir, "", fator1_dir);
+                string mais_fatores_dir = mais_fatores(fator1_dir);
+                return mais_fatores_dir;
+            }
+            else
+            {
+                string mais_fatores_dir = mais_fatores(fator_dir);
+                return mais_fatores_dir;
+            }
         }
 
-        private void op_un()
+        private string op_un()
         {
             
             Console.WriteLine("op_un");
 
             if (token.term.Equals("-"))
             {
+                string op_un_dir = token.term;
                 getToken();
+                return op_un_dir;
             }
+
+            return "";
         }
 
-        private void fator()
+        private string fator()
         {
             Console.WriteLine("fator");
-            if (token.type is TokenEnum.IDENT or TokenEnum.REAL or TokenEnum.INTEGER)
+            if (token.type is TokenEnum.IDENT)
             {
-               
-                if (token.type == TokenEnum.IDENT)
-                {
-                    verif_table_symbol();
-                    getTypeExp();
-                }
+                verif_table_symbol();
+                getTypeExp();
+                Token id = token;
                 getToken();
+                return tableSymbol[id.term].name;
+                
+            }
+            
+            else if (token.type is TokenEnum.REAL or TokenEnum.INTEGER)
+            {
+                Token id = token;
+                getToken();
+                return id.term;
             }
 
-            else if (!token.term.Equals(";"))
+            if (!token.term.Equals(";"))
             {
                 getToken();
                 if (token.term.Equals("("))
                 {
-                    expressao();
                     getToken();
+                    string expressao_dir = expressao();
                     if (token.term.Equals(")"))
                     {
                         getToken();
+                        return expressao_dir;
                     }
                 }
             }
+
+            return "";
         }
 
-        private void mais_fatores()
+        private string mais_fatores(string fator_esq)
         {
             Console.WriteLine("mais_fatores");
             
             if (token.term is "*" or "/")
             {
                 op_mul();
-                fator();
-                mais_fatores();
+                string fator_dir = fator();
+                string mais_fatores1_dir = mais_fatores(fator_dir);
+                string mais_fatores_dir = geraTemp();
+                code("*", fator_esq, mais_fatores1_dir, mais_fatores_dir);
+                return mais_fatores_dir;
+            }
+            else
+            {
+                return fator_esq;
             }
         }
 
-        private void outros_termos()
+        private string outros_termos(string outros_termos_esq)
         {
             Console.WriteLine("outros_termos");
 
             if (token.term is "+" or "-")
             {
                 op_ad();
-                termo();
-                outros_termos();
+                string termo_dir =  termo();
+                string outros_termos1_dir = outros_termos(termo_dir);
+                string outros_termos_dir = geraTemp();
+                code("+", outros_termos_esq, outros_termos1_dir, outros_termos_dir);
+                return outros_termos_dir;
             }
+
+            return outros_termos_esq;
         }
 
         private void op_mul()
@@ -363,20 +438,27 @@ namespace compilador
             }
         }
 
-        private void condicao()
+        private string condicao()
         {
-            expressao();
-            relacao();
-            expressao();
+            string expressao_dir = expressao();
+            string relacao_dir = relacao();
+            string expressao1_dir =expressao();
+            string condicao_dir = geraTemp();
+            code(relacao_dir, expressao_dir, expressao1_dir, condicao_dir);
+            return condicao_dir;
         }
 
-        private void relacao()
+        private string relacao()
         {
             Console.WriteLine("relacao");
             if (token.type == TokenEnum.RELATIONAL)
             {
+                string op = token.term;
                 getToken();
+                return op;
             }
+
+            return "";
         }
 
         private void pfalsa()
@@ -384,15 +466,19 @@ namespace compilador
             Console.WriteLine("pfalsa");
             if (!token.term.Equals("$"))
             {
+                replace_getLine(cont+1);
                 if (verifyToken("else"))
                 {
+                    replace_getLine(cont);
+                    code("goto", getLine(), "", "");
                     getToken();
                     comandos();
+                    replace_getLine(cont);
                 }
             }
         }
 
-        private void verif_parenteses()
+        private void verif_parenteses(string op)
         {
             Console.WriteLine("verif_parenteses");
             getToken();
@@ -402,6 +488,15 @@ namespace compilador
                 if (token.type == TokenEnum.IDENT)
                 {
                     verif_table_symbol();
+                    if (op == "read")
+                    {
+                        Console.WriteLine(token.term);
+                        code(op, "", "", token.term);
+                    }
+                    else
+                    {
+                        code(op, token.term, "", "");
+                    }
                     getToken();
                     if (!(token.term.Equals(")")))
                     {
